@@ -1,0 +1,24 @@
+<html>
+<body>
+<img id="feed"></img>
+</body>
+<script>
+    const url = '/video_feed';
+    const img = document.getElementById('feed');
+    update = function()
+    {
+      img.src = "about:blank";
+      img.src = url+"?t="+new Date().getTime();
+    }
+    run = 1;
+    interval = -1;
+    if(run===1)
+    {
+      interval = setInterval(update, 200);
+    }
+    stop = function()
+    {
+      clearInterval(interval)
+    }
+  </script>
+</html>
