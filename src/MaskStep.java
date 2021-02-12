@@ -48,9 +48,9 @@ public class MaskStep extends ProcessStep
 
     private BufferedImage bufferOut;
 
-    private BrowserSourceServer server;
+    private WebSocketImageServer server;
 
-    public MaskStep() throws OrtException
+    public MaskStep() throws OrtException, IOException
     {
         env = OrtEnvironment.getEnvironment();
         session = env.createSession(MODEL_PATH,new OrtSession.SessionOptions());
@@ -67,14 +67,10 @@ public class MaskStep extends ProcessStep
 
         scaler = new FDistort();
         raster = new ConvertRaster();
-        server = new BrowserSourceServer(this, "localhost", 7777);
-        try
-        {
-            server.start();
-        } catch (IOException e)
-        {
-            e.printStackTrace();
-        }
+        //server = new BrowserSourceServer(this, "localhost", 7777);
+
+        server = new WebSocketImageServer(7778,7777);
+        server.start();
     }
 
     @Override
@@ -183,6 +179,7 @@ public class MaskStep extends ProcessStep
         {
             ConvertRaster.interleavedToBuffered(inter, (DataBufferInt) bufferOut.getRaster().getDataBuffer(), bufferOut.getRaster());
         }
+        server.writeImage(bufferOut);
         return bufferOut;
     }
 

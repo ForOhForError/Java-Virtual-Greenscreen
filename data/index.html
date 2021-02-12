@@ -1,24 +1,30 @@
 <html>
+<script>
+    var connection = new WebSocket('ws://localhost:7778');
+    var msg = "";
+    log = function(msg){
+
+        document.getElementById("debuglog").textContent += msg+" "
+    }
+    handledata = function(b64)
+    {
+        document.getElementById("feed").src = "data:image/png;base64," + b64;
+        log("data handle");
+    }
+    connection.onmessage = function (message) {
+        msg = message.data;
+        log("message get");
+        //log(msg.text());
+        //msg.text().then(handledata);
+        fr = new FileReader();
+        fr.readAsText(msg);
+        fr.onloadend = function(){
+            document.getElementById("feed").src = "data:image/png;base64," + fr.result;
+        }
+    };
+</script>
 <body>
 <img id="feed"></img>
+<p id="debuglog"></p>
 </body>
-<script>
-    const url = '/video_feed';
-    const img = document.getElementById('feed');
-    update = function()
-    {
-      img.src = "about:blank";
-      img.src = url+"?t="+new Date().getTime();
-    }
-    run = 1;
-    interval = -1;
-    if(run===1)
-    {
-      interval = setInterval(update, 200);
-    }
-    stop = function()
-    {
-      clearInterval(interval)
-    }
-  </script>
 </html>
