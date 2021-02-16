@@ -15,11 +15,13 @@ public class WebSocketImageServer extends WebSocketServer
 {
     private final HttpServer server;
     private final Set<WebSocket> connections = new HashSet<>();
+    private String host;
 
-    public WebSocketImageServer(int webPort, int wsPort) throws IOException
+    public WebSocketImageServer(int webPort, int wsPort, String host) throws IOException
     {
-        super(new InetSocketAddress("localhost",wsPort));
-        server = HttpServer.create(new InetSocketAddress("localhost",webPort), 0);
+        super(new InetSocketAddress(host,wsPort));
+        this.host = host;
+        server = HttpServer.create(new InetSocketAddress(host,webPort), 0);
     }
 
     public void start() {
@@ -46,7 +48,7 @@ public class WebSocketImageServer extends WebSocketServer
         {
             try
             {
-                String conf = String.format("var ws_connect_string = \"ws://%s:%d/\"","localhost", wsPort);
+                String conf = String.format("var ws_connect_string = \"ws://%s:%d/\"",host, wsPort);
                 exchange.getResponseHeaders().add("Content-type","application/javascript");
                 exchange.sendResponseHeaders(200,conf.length());
                 exchange.getResponseBody().write(conf.getBytes(StandardCharsets.UTF_8));
@@ -111,7 +113,6 @@ public class WebSocketImageServer extends WebSocketServer
     public void onOpen(WebSocket webSocket, ClientHandshake clientHandshake)
     {
         connections.add(webSocket);
-        System.out.println("Client connected: "+clientHandshake.getResourceDescriptor());
     }
 
     @Override
@@ -137,6 +138,6 @@ public class WebSocketImageServer extends WebSocketServer
     @Override
     public void onStart()
     {
-        System.out.println("WebSocket server up at "+this.getAddress());
+
     }
 }

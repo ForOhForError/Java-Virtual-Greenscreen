@@ -22,6 +22,7 @@ public class MaskApp extends JFrame{
 
 	private JPanel rightSide;
 	private ConfigPanel configPanel;
+	private MaskStep masker;
 
 	public void addStep(ProcessStep step)
 	{
@@ -66,12 +67,25 @@ public class MaskApp extends JFrame{
 		}
 
 		rightSide = new JPanel();
-		rightSide.setLayout(new GridLayout(2,1));
 
 		wc = new WebcamCanvas(w);
 
 		add(wc,BorderLayout.CENTER);
 		add(rightSide,BorderLayout.EAST);
+
+		try
+		{
+			masker = new MaskStep();
+		} catch (OrtException e)
+		{
+			e.printStackTrace();
+			System.exit(1);
+		} catch (IOException e)
+		{
+			e.printStackTrace();
+			System.exit(1);
+		}
+		addStep(masker);
 	}
 
 	public void setWebcam(Webcam w)
@@ -96,17 +110,20 @@ public class MaskApp extends JFrame{
 		return w;
 	}
 
+	public boolean startServer(int webPort, int wsPort, String host)
+	{
+		return masker.startServer(webPort, wsPort, host);
+	}
+
+	public void stopServer()
+	{
+		masker.stopServer();
+	}
+
 	public static void main(String[] args) throws OrtException
 	{
 		MaskApp app = new MaskApp("Virtual Green Screen");
 		INSTANCE = app;
-		try
-		{
-			app.addStep(new MaskStep());
-			app.run();
-		} catch (IOException e)
-		{
-			e.printStackTrace();
-		}
+		app.run();
 	}
 }

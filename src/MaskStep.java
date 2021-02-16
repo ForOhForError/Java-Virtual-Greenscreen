@@ -64,9 +64,6 @@ public class MaskStep extends ProcessStep
         outFrame = null;
 
         scaler = new FDistort();
-
-        server = new WebSocketImageServer(7777, 7778);
-        server.start();
     }
 
     @Override
@@ -172,7 +169,10 @@ public class MaskStep extends ProcessStep
         //Convert to ARGB BufferedImage output
         InterleavedF32 inter = ConvertImage.convert(inFrame, new InterleavedF32(inFrame.width, inFrame.height, 4));
         ConvertRaster.interleavedToBuffered(inter, (DataBufferInt) bufferOut.getRaster().getDataBuffer(), bufferOut.getRaster());
-        server.writeImage(bufferOut);
+        if(server != null)
+        {
+            server.writeImage(bufferOut);
+        }
         return bufferOut;
     }
 
@@ -180,5 +180,24 @@ public class MaskStep extends ProcessStep
     protected boolean handleClick(MouseEvent e)
     {
         return false;
+    }
+
+
+    public boolean startServer(int webPort, int wsPort, String host)
+    {
+        try
+        {
+            server = new WebSocketImageServer(webPort, wsPort, host);
+        } catch (IOException e)
+        {
+            return false;
+        }
+        server.start();
+        return true;
+    }
+
+    public void stopServer()
+    {
+        server.stop();
     }
 }

@@ -3,6 +3,9 @@ import javax.swing.*;
 import com.github.sarxos.webcam.Webcam;
 import org.json.*;
 
+import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionListener;
 import java.io.*;
 import java.util.LinkedList;
@@ -25,10 +28,17 @@ public class ConfigPanel extends JPanel
 
     private JSpinner wsPortSpinner;
     private JSpinner webPortSpinner;
+    private JTextField hostField;
+
+    private JButton serverToggle;
+    private boolean serverRunning = false;
 
     public ConfigPanel()
     {
         super();
+
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+
         for(Webcam cam:Webcam.getWebcams())
         {
             pcams.add(new PrettyWebcam(cam));
@@ -56,6 +66,7 @@ public class ConfigPanel extends JPanel
         }
         initDefaults();
         initGUI();
+        write();
     }
 
     private void initGUI()
@@ -63,6 +74,37 @@ public class ConfigPanel extends JPanel
         camList = new JComboBox<>();
         dimList = new JComboBox<>();
 
+        serverToggle = new JButton("Start Server");
+        serverToggle.addActionListener(event -> {
+            MaskApp app = MaskApp.INSTANCE;
+            if(serverRunning)
+            {
+                app.stopServer();
+                serverToggle.setText("Start Server");
+                wsPortSpinner.setEnabled(true);
+                webPortSpinner.setEnabled(true);
+                hostField.setEnabled(true);
+                serverRunning=false;
+            }
+            else
+            {
+                boolean res = app.startServer(
+                    (int)webPortSpinner.getValue(),
+                    (int)wsPortSpinner.getValue(),
+                    hostField.getText()
+                );
+                if(res)
+                {
+                    serverToggle.setText("Stop Server");
+                    wsPortSpinner.setEnabled(false);
+                    webPortSpinner.setEnabled(false);
+                    hostField.setEnabled(false);
+                    serverRunning = true;
+                    updateFromGUI();
+                    write();
+                }
+            }
+        });
 
         wsPortSpinner = new JSpinner(new SpinnerNumberModel(
                 1,0,65535,1)
@@ -75,8 +117,20 @@ public class ConfigPanel extends JPanel
         JSpinner.NumberEditor webEditor = new JSpinner.NumberEditor( webPortSpinner, "#" );
         webPortSpinner.setEditor(webEditor);
 
+        hostField = new JTextField();
+        hostField.setText((String)configObject.get("host"));
+
+        JButton copyAddress = new JButton("Copy Web Address");
+        copyAddress.addActionListener(event -> {
+            String content = String.format("http://%s:%d/",hostField.getText(),webPortSpinner.getValue());
+            StringSelection stringSelection = new StringSelection(content);
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(stringSelection, null);
+        });
+
         wsPortSpinner.setValue(configObject.get("web_socket_port"));
         webPortSpinner.setValue(configObject.get("web_port"));
+
 
         for(PrettyWebcam w:pcams)
         {
@@ -89,7 +143,6 @@ public class ConfigPanel extends JPanel
             setCam(sel);
         };
         camList.addActionListener(camListener);
-        add(camList);
 
         dimListener = event ->
         {
@@ -106,10 +159,19 @@ public class ConfigPanel extends JPanel
             }
         };
         dimList.addActionListener(dimListener);
-        add(dimList);
 
+        add(new JLabel("Camera"));
+        add(camList);
+        add(new JLabel("Resolution"));
+        add(dimList);
+        add(new JLabel("Web Port"));
         add(webPortSpinner);
+        add(new JLabel("Websocket Port"));
         add(wsPortSpinner);
+        add(new JLabel("Host"));
+        add(hostField);
+        add(serverToggle);
+        add(copyAddress);
 
         setCam(Webcam.getDefault());
     }
@@ -161,6 +223,17 @@ public class ConfigPanel extends JPanel
         {
             configObject.put("web_socket_port",7778);
         }
+        if(!configObject.has("hostname"))
+        {
+            configObject.put("host","localhost");
+        }
+    }
+
+    private void updateFromGUI()
+    {
+        configObject.put("web_port",webPortSpinner.getValue());
+        configObject.put("web_socket_port",wsPortSpinner.getValue());
+        configObject.put("host", hostField.getText());
     }
 
     private void write()
