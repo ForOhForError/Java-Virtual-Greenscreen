@@ -3,10 +3,8 @@ import ai.onnxruntime.*;
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferInt;
 import java.io.IOException;
-import java.nio.Buffer;
 import java.nio.FloatBuffer;
 import java.util.HashMap;
 
@@ -29,22 +27,22 @@ import georegression.struct.affine.Affine2D_F64;
 
 public class MaskStep extends ProcessStep
 {
-    private static String MODEL_PATH = "./data/deconv_bnoptimized_munet.onnx";
-    private static long[] TENSOR_DIMS = {1, 128, 128, 3};
-    private static int BUFFER_LEN = 128*128*3;
+    private static final String MODEL_PATH = "./data/deconv_bnoptimized_munet.onnx";
+    private static final long[] TENSOR_DIMS = {1, 128, 128, 3};
+    private static final int BUFFER_LEN = 128*128*3;
 
-    private OrtEnvironment env;
-    private OrtSession session;
+    private final OrtEnvironment env;
+    private final OrtSession session;
+
+    private final Planar<GrayF32> netInput;
+    private final GrayF32 netOutput;
 
     private Planar<GrayF32> inFrame;
-    private Planar<GrayF32> netInput;
-    private GrayF32 netOutput;
     private GrayF32 outFrame;
 
-    private FloatBuffer fb;
+    private final FloatBuffer fb;
 
     private final FDistort scaler;
-    private final ConvertRaster raster;
 
     private BufferedImage bufferOut;
 
@@ -55,7 +53,7 @@ public class MaskStep extends ProcessStep
         env = OrtEnvironment.getEnvironment();
         session = env.createSession(MODEL_PATH,new OrtSession.SessionOptions());
 
-        netInput = new Planar<GrayF32>(GrayF32.class, 128, 128, 3);
+        netInput = new Planar<>(GrayF32.class, 128, 128, 3);
 
         inFrame = null;
 
@@ -66,10 +64,8 @@ public class MaskStep extends ProcessStep
         outFrame = null;
 
         scaler = new FDistort();
-        raster = new ConvertRaster();
-        //server = new BrowserSourceServer(this, "localhost", 7777);
 
-        server = new WebSocketImageServer(7778,7777);
+        server = new WebSocketImageServer(7777, 7778);
         server.start();
     }
 
@@ -175,10 +171,7 @@ public class MaskStep extends ProcessStep
 
         //Convert to ARGB BufferedImage output
         InterleavedF32 inter = ConvertImage.convert(inFrame, new InterleavedF32(inFrame.width, inFrame.height, 4));
-        synchronized (bufferOut)
-        {
-            ConvertRaster.interleavedToBuffered(inter, (DataBufferInt) bufferOut.getRaster().getDataBuffer(), bufferOut.getRaster());
-        }
+        ConvertRaster.interleavedToBuffered(inter, (DataBufferInt) bufferOut.getRaster().getDataBuffer(), bufferOut.getRaster());
         server.writeImage(bufferOut);
         return bufferOut;
     }
@@ -187,13 +180,5 @@ public class MaskStep extends ProcessStep
     protected boolean handleClick(MouseEvent e)
     {
         return false;
-    }
-
-    public BufferedImage getFrame()
-    {
-        synchronized (bufferOut)
-        {
-            return bufferOut;
-        }
     }
 }

@@ -10,6 +10,7 @@ import javax.swing.event.MouseInputListener;
 
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.util.concurrent.locks.Lock;
 
 import com.github.sarxos.webcam.Webcam;
 
@@ -33,12 +34,14 @@ public class WebcamCanvas extends JPanel implements MouseInputListener, KeyListe
 	private BufferedImage lastDrawn;
 	private BufferedImage buf;
 
+	private Lock lock;
+
 	public void addStep(ProcessStep step)
 	{
 		steps.add(step);
 	}
 
-	public void setWebcam(Webcam w) {
+	public synchronized void setWebcam(Webcam w) {
 		cam.close();
 		cam = w;
 		setSize(w.getViewSize());
@@ -58,45 +61,48 @@ public class WebcamCanvas extends JPanel implements MouseInputListener, KeyListe
 		return lastDrawn;
 	}
 
-	public void draw() {
-		if (!cam.isOpen()) {
-			cam.open();
-		}
-		lastDrawn = cam.getImage();
-
-		if(lastDrawn == null)
+	public synchronized void draw() {
+		synchronized (cam)
 		{
-			return;
-		}
+			if (!cam.isOpen())
+			{
+				cam.open(true);
+			}
+			lastDrawn = cam.getImage();
 
-		Dimension lastOutSize = cam.getViewSize();
-		for(ProcessStep step : steps)
-		{
-			step.updateOutputDim(lastOutSize);
-			lastOutSize = step.getOutputDim();
-		}
+			if (lastDrawn == null)
+			{
+				return;
+			}
 
-		if(steps.size() > 0)
-		{
-			Dimension last = steps.get(steps.size()-1).getOutputDim();
-			resizeBuf(last);
-		}
-		else
-		{
-			Dimension view = cam.getViewSize();
-			resizeBuf(view);
-		}
+			Dimension lastOutSize = cam.getViewSize();
+			for (ProcessStep step : steps)
+			{
+				step.updateOutputDim(lastOutSize);
+				lastOutSize = step.getOutputDim();
+			}
 
-		for(ProcessStep step : steps)
-		{
-			lastDrawn = step.doProcess(lastDrawn);
+			if (steps.size() > 0)
+			{
+				Dimension last = steps.get(steps.size() - 1).getOutputDim();
+				resizeBuf(last);
+			} else
+			{
+				Dimension view = cam.getViewSize();
+				resizeBuf(view);
+			}
+
+			for (ProcessStep step : steps)
+			{
+				lastDrawn = step.doProcess(lastDrawn);
+			}
+
+			Graphics gi = canvas.getGraphics();
+			Graphics g = buf.getGraphics();
+
+			g.drawImage(lastDrawn, 0, 0, null);
+			gi.drawImage(buf, 0, 0, null);
 		}
-
-		Graphics gi = canvas.getGraphics();
-		Graphics g = buf.getGraphics();
-
-		g.drawImage(lastDrawn, 0, 0, null);
-		gi.drawImage(buf, 0, 0, null);
 	}
 
 	private void resizeBuf(Dimension dim)

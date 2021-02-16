@@ -1,6 +1,4 @@
 import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -10,41 +8,54 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class WebSocketImageServer extends WebSocketServer
 {
-    private HttpServer server;
-    private Set<WebSocket> connections = new HashSet<WebSocket>();
+    private final HttpServer server;
+    private final Set<WebSocket> connections = new HashSet<>();
 
-    public WebSocketImageServer(int wsport, int webport) throws IOException
+    public WebSocketImageServer(int webPort, int wsPort) throws IOException
     {
-        super(new InetSocketAddress("localhost",wsport));
-        server = HttpServer.create(new InetSocketAddress("localhost",webport), 0);
+        super(new InetSocketAddress("localhost",wsPort));
+        server = HttpServer.create(new InetSocketAddress("localhost",webPort), 0);
     }
 
     public void start() {
-        server.createContext("/", new HttpHandler()
+        final int wsPort = this.getPort();
+        server.createContext("/", exchange ->
         {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException
+            FileInputStream fin;
+            try
             {
-                FileInputStream fin;
-                try
-                {
-                    fin = new FileInputStream("./data/index.html");
-                    Headers responseHeaders = exchange.getResponseHeaders();
-                    responseHeaders.add("Content-type","text/html");
-                    exchange.sendResponseHeaders(200,fin.available());
-                    exchange.getResponseBody().write(fin.readAllBytes());
-                    fin.close();
-                    exchange.getResponseBody().close();
-                } catch (FileNotFoundException e)
-                {
-                    exchange.sendResponseHeaders(400,0);
-                }
-
+                fin = new FileInputStream("./data/index.html");
+                Headers responseHeaders = exchange.getResponseHeaders();
+                responseHeaders.add("Content-type","text/html");
+                exchange.sendResponseHeaders(200,fin.available());
+                exchange.getResponseBody().write(fin.readAllBytes());
+                fin.close();
+                exchange.getResponseBody().close();
+            } catch (FileNotFoundException e)
+            {
+                exchange.sendResponseHeaders(400,0);
             }
+
+        });
+        server.createContext("/config.js", exchange ->
+        {
+            try
+            {
+                String conf = String.format("var ws_connect_string = \"ws://%s:%d/\"","localhost", wsPort);
+                exchange.getResponseHeaders().add("Content-type","application/javascript");
+                exchange.sendResponseHeaders(200,conf.length());
+                exchange.getResponseBody().write(conf.getBytes(StandardCharsets.UTF_8));
+                exchange.getResponseBody().close();
+            } catch (FileNotFoundException e)
+            {
+                exchange.sendResponseHeaders(400,0);
+            }
+
         });
         server.setExecutor(null);
         server.start();
@@ -54,7 +65,7 @@ public class WebSocketImageServer extends WebSocketServer
     public boolean writeImage(BufferedImage img)
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        byte[] base64 = {};
+        byte[] base64;
         try
         {
             ImageIO.write(img, "png", baos);
@@ -65,7 +76,7 @@ public class WebSocketImageServer extends WebSocketServer
             {
                 baos.close();
             }
-            catch(IOException e)
+            catch(IOException ignored)
             {
             }
             return false;
@@ -78,7 +89,7 @@ public class WebSocketImageServer extends WebSocketServer
         {
             baos.close();
         }
-        catch(IOException e)
+        catch(IOException ignored)
         {
         }
         return true;
@@ -90,11 +101,7 @@ public class WebSocketImageServer extends WebSocketServer
         try
         {
             super.stop();
-        }catch(IOException e)
-        {
-
-        }
-        catch(InterruptedException e)
+        }catch(IOException | InterruptedException ignored)
         {
 
         }
@@ -116,7 +123,6 @@ public class WebSocketImageServer extends WebSocketServer
     @Override
     public void onMessage(WebSocket webSocket, String s)
     {
-
     }
 
     @Override

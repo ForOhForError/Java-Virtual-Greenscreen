@@ -1,21 +1,10 @@
 <html>
+<script src="/config.js"></script>
 <script>
-    var connection = new WebSocket('ws://localhost:7778');
+    var connection = new WebSocket(ws_connect_string);
     var msg = "";
-    log = function(msg){
-
-        document.getElementById("debuglog").textContent += msg+" "
-    }
-    handledata = function(b64)
-    {
-        document.getElementById("feed").src = "data:image/png;base64," + b64;
-        log("data handle");
-    }
     connection.onmessage = function (message) {
         msg = message.data;
-        log("message get");
-        //log(msg.text());
-        //msg.text().then(handledata);
         fr = new FileReader();
         fr.readAsText(msg);
         fr.onloadend = function(){
@@ -25,6 +14,5 @@
 </script>
 <body>
 <img id="feed"></img>
-<p id="debuglog"></p>
 </body>
 </html>
