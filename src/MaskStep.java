@@ -196,6 +196,13 @@ public class MaskStep extends ProcessStep
         return true;
     }
 
+    public void updateOutputDim(Dimension d)
+    {
+        super.updateOutputDim(d);
+        this.bufferOut = null;
+        this.outFrame = null;
+    }
+
     public void stopServer()
     {
         server.stop();
