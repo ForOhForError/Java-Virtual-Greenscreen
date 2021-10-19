@@ -157,7 +157,7 @@ public class MaskStep extends ProcessStep
         netOutputs.add(netOutput);
 
         GrayF32 averagedMask = netOutput.createSameShape();
-        System.out.println(netOutputs.size());
+
         for(GrayF32 frame:netOutputs)
         {
             GPixelMath.add(averagedMask, frame, averagedMask);
