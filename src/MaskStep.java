@@ -6,8 +6,10 @@ import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.io.IOException;
 import java.nio.FloatBuffer;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 
+import boofcv.alg.filter.basic.GrayImageOps;
 import boofcv.alg.filter.binary.BinaryImageOps;
 import boofcv.alg.filter.binary.GThresholdImageOps;
 import boofcv.alg.filter.binary.ThresholdImageOps;
@@ -35,7 +37,6 @@ public class MaskStep extends ProcessStep
     private final OrtSession session;
 
     private final Planar<GrayF32> netInput;
-    private final GrayF32 netOutput;
 
     private Planar<GrayF32> inFrame;
     private GrayF32 outFrame;
@@ -48,16 +49,21 @@ public class MaskStep extends ProcessStep
 
     private WebSocketImageServer server;
 
+    private int averageLastNFrames = 2;
+    private int blurRadius = 3;
+    private int erodeBorders = 0;
+
+    private ArrayDeque<GrayF32> netOutputs;
+
     public MaskStep() throws OrtException, IOException
     {
         env = OrtEnvironment.getEnvironment();
         session = env.createSession(MODEL_PATH,new OrtSession.SessionOptions());
+        netOutputs = new ArrayDeque<GrayF32>();
 
         netInput = new Planar<>(GrayF32.class, 128, 128, 3);
 
         inFrame = null;
-
-        netOutput = new GrayF32(128,128);
 
         fb = FloatBuffer.allocate(BUFFER_LEN);
 
@@ -130,6 +136,15 @@ public class MaskStep extends ProcessStep
             return in;
         }
 
+        GrayF32 netOutput = null;
+        while(netOutputs.size() >= averageLastNFrames){
+            netOutput = netOutputs.removeFirst();
+        }
+        if(netOutput==null)
+        {
+            netOutput = new GrayF32(128,128);
+        }
+
         //Parse result back into BoofCV format
         for(int x=0; x<128; x++)
         {
@@ -139,13 +154,23 @@ public class MaskStep extends ProcessStep
                 netOutput.set(x,y,val);
             }
         }
+        netOutputs.add(netOutput);
+
+        GrayF32 averagedMask = netOutput.createSameShape();
+        System.out.println(netOutputs.size());
+        for(GrayF32 frame:netOutputs)
+        {
+            GPixelMath.add(averagedMask, frame, averagedMask);
+        }
+        GPixelMath.divide(averagedMask, netOutputs.size(), averagedMask);
+
         if(outFrame == null)
         {
             outFrame = new GrayF32(inFrame.width, inFrame.height);
         }
 
         //Rescale network output to the size of the input frame
-        scaler.init(netOutput,outFrame);
+        scaler.init(averagedMask,outFrame);
         scaler.border(BorderType.EXTENDED);
         scaler.affine(transformOut);
         scaler.apply();
@@ -153,12 +178,18 @@ public class MaskStep extends ProcessStep
         //Post process the neural network output into a binary mask
         //Gaussian blur -> Otsu binary threshold and invert -> Gaussian blur
         //Additionally convert to the float datatype, and scale the values to 0-255
-        BlurImageOps.gaussian(outFrame,outFrame,-1,3,null);
+        BlurImageOps.gaussian(outFrame,outFrame,-1,blurRadius,null);
         double threshold = GThresholdImageOps.computeOtsu(outFrame, 0, 255);
         GrayU8 bin = ThresholdImageOps.threshold(outFrame,null,(float)threshold,true);
         BinaryImageOps.invert(bin,bin);
+        if(erodeBorders > 0)
+        {
+            GrayU8 binCopy = bin.createSameShape();
+            BinaryImageOps.erode8(bin, erodeBorders, binCopy);
+            bin = binCopy;
+        }
         GrayF32 binFloat = ConvertImage.convert(bin, new GrayF32(bin.width, bin.height));
-        BlurImageOps.gaussian(binFloat,binFloat,-1,3,null);
+        BlurImageOps.gaussian(binFloat,binFloat,-1,blurRadius,null);
         GPixelMath.multiply(binFloat, 255,binFloat);
 
         //Add mask as alpha channel to the input frame
@@ -168,7 +199,11 @@ public class MaskStep extends ProcessStep
 
         //Convert to ARGB BufferedImage output
         InterleavedF32 inter = ConvertImage.convert(inFrame, new InterleavedF32(inFrame.width, inFrame.height, 4));
-        ConvertRaster.interleavedToBuffered(inter, (DataBufferInt) bufferOut.getRaster().getDataBuffer(), bufferOut.getRaster());
+        ConvertRaster.interleavedToBuffered(
+            inter,
+            (DataBufferInt) bufferOut.getRaster().getDataBuffer(),
+            bufferOut.getRaster()
+        );
         if(server != null)
         {
             server.writeImage(bufferOut);
@@ -198,13 +233,36 @@ public class MaskStep extends ProcessStep
 
     public void updateOutputDim(Dimension d)
     {
-        super.updateOutputDim(d);
-        this.bufferOut = null;
-        this.outFrame = null;
+        if(!d.equals(this.outputDim))
+        {
+            super.updateOutputDim(d);
+            this.bufferOut = null;
+            this.outFrame = null;
+            this.netOutputs.clear();
+        }
     }
 
     public void stopServer()
     {
         server.stop();
+    }
+
+    public void setFrameAverage(int n)
+    {
+        if(n>0){
+            averageLastNFrames = n;
+        }
+    }
+
+    public void setBlurRadius(int n)
+    {
+        if(n>0){
+            blurRadius = n;
+        }
+    }
+
+    public void setErodeBorders(int n)
+    {
+        erodeBorders = n;
     }
 }

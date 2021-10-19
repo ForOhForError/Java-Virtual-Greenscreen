@@ -120,6 +120,21 @@ public class MaskApp extends JFrame{
 		masker.stopServer();
 	}
 
+	public void setFrameAverage(int n)
+	{
+		masker.setFrameAverage(n);
+	}
+
+	public void setBlurRadius(int n)
+	{
+		masker.setBlurRadius(n);
+	}
+
+	public void setShrinkEdges(int n)
+	{
+		masker.setErodeBorders(n);
+	}
+
 	public static void main(String[] args) throws OrtException
 	{
 		MaskApp app = new MaskApp("Virtual Green Screen");

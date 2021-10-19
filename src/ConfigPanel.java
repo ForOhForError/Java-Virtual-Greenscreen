@@ -131,6 +131,24 @@ public class ConfigPanel extends JPanel
         wsPortSpinner.setValue(configObject.get("web_socket_port"));
         webPortSpinner.setValue(configObject.get("web_port"));
 
+        JSlider averageSlider = new JSlider(JSlider.HORIZONTAL, 1, 8, 2);
+        averageSlider.addChangeListener(event -> {
+            MaskApp.INSTANCE.setFrameAverage(averageSlider.getValue());
+        });
+
+        JSpinner blurSpinner = new JSpinner(
+                new SpinnerNumberModel(3,1,30,1)
+        );
+        blurSpinner.addChangeListener(event -> {
+            MaskApp.INSTANCE.setBlurRadius((int)blurSpinner.getValue());
+        });
+
+        JSpinner shrinkSpinner = new JSpinner(
+                new SpinnerNumberModel(0,0,30,1)
+        );
+        shrinkSpinner.addChangeListener(event -> {
+            MaskApp.INSTANCE.setShrinkEdges((int)shrinkSpinner.getValue());
+        });
 
         for(PrettyWebcam w:pcams)
         {
@@ -164,6 +182,12 @@ public class ConfigPanel extends JPanel
         add(camList);
         add(new JLabel("Resolution"));
         add(dimList);
+        add(new JLabel("Blur Edge Radius"));
+        add(blurSpinner);
+        add(new JLabel("Pixels to Shrink Mask"));
+        add(shrinkSpinner);
+        add(new JLabel("Mask Smoothness"));
+        add(averageSlider);
         add(new JLabel("Web Port"));
         add(webPortSpinner);
         add(new JLabel("Websocket Port"));
